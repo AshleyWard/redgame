@@ -11,6 +11,9 @@ class GameScene extends Phaser.Scene {
         this.load.spritesheet('acorn', './src/img/acorn.png', { frameWidth:48, frameHeight:48 } );  //48 x 48
         this.load.image('stump', './src/img/stump.png') ;  //48 x 48
         this.load.image('shadow', './src/img/shadow.png') ;  //48 x 48
+        this.load.image('sapling', './src/img/stump.png') ;  //48 x 48
+        this.load.image('youngling', './src/img/stump.png') ;  //48 x 48
+        this.load.image('wholeling', './src/img/stump.png') ;  //48 x 48
     }
 
     create ()
@@ -81,6 +84,8 @@ class GameScene extends Phaser.Scene {
 
         //actions
         //#region
+
+        //JUMP
         gameState.actions.jumpHelper = this.physics.add.sprite(0, 0)
         gameState.actions.jumpHelper.yChanged = false;
         gameState.actions.jumpHelper.lastY = 0;
@@ -116,10 +121,12 @@ class GameScene extends Phaser.Scene {
 
 
         
-
+        //ATTACK
         var basicWeapon = {
-            name: 'acorn',
-            delay:  '500'
+            name:       'acorn',
+            delay:      500,
+            growTime:   5000,
+            lifeTime:   50000
         }
 
         gameState.weapons = {};
@@ -157,12 +164,13 @@ class GameScene extends Phaser.Scene {
                 let acornTweenY = this.tweens.add({
                     paused:     true,
                     targets:    attackNut,
-                    y:          squirrel.y - 100,
+                    y:          squirrel.y - 100 + (2*facingOffsetY),
                     ease:       'Sine',
                     duration:   400,
                     repeat:     0,
                     yoyo:       true,
                     onComplete: function () {
+                        gameState.actions.plant(attackNut, proj);
                         attackNut.destroy();
                     }
                 });
@@ -189,7 +197,76 @@ class GameScene extends Phaser.Scene {
             }
         }
 
-        
+        console.log(this);
+        //GROW
+        gameState.trees = {
+            list:   [],
+            grow:   function(tree, scene){
+                console.log(`${tree} has grown!`)
+
+                if (tree.sprite.name === 'sapling'){
+                    
+                    console.log(`this: ${scene} -- tree: ${tree}`);
+
+                    var youngTree = scene.add.sprite(tree.sprite.x, tree.sprite.y, 'youngling')
+                    youngTree.setName('youngling');
+                    youngTree.setScale(1,2);
+                    
+                    tree.sprite.destroy()
+                    tree.sprite = youngTree;
+
+                    scene.time.delayedCall(tree.type.growTime, () => {
+                        gameState.trees.grow(tree, scene);
+                    });
+
+                    console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+
+                } else if (tree.sprite.name === 'youngling'){
+
+                    var wholeTree = scene.add.sprite(tree.sprite.x, tree.sprite.y, 'wholeling');
+                    wholeTree.setName('wholeling');
+                    wholeTree.setScale(2,4);
+                    
+                    tree.sprite.destroy()
+                    tree.sprite = wholeTree;
+
+                    scene.time.delayedCall(tree.type.lifeTime, () => {
+                        gameState.trees.grow(tree, scene);
+                    });
+
+                    console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+
+                } else if (tree.sprite.name === 'wholeling'){
+                    
+                    tree.sprite.destroy()
+                    console.log(`${tree} has died.`);
+
+                } else {
+                    console.log('an error has occurred in gameState.trees.grow()');
+                }
+
+                tree.step += 1
+
+                console.log(tree.sprite);
+            }
+        }
+
+        gameState.actions.plant = (attackNut, proj) => {
+            //attackNut: The actual sprite being acted on
+            //proj:      Projectile properties
+            var treeBaby = this.add.sprite(attackNut.x, attackNut.y, 'sapling').setName('sapling');
+            var newTree;
+            newTree = {
+                type:           proj,
+                sprite:         treeBaby,
+                step:           0,
+                growCallback:   this.time.delayedCall(proj.growTime, () => {
+                    gameState.trees.grow(newTree, this);
+                })
+            }
+            gameState.trees.list.push(newTree);
+
+        }
         //#endregion
         
 
