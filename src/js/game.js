@@ -441,6 +441,10 @@ class GameScene extends Phaser.Scene {
             gameState.actions.jumpHelper.lastY = gameState.actions.jumpHelper.y
         }
         
+        if (player.touchingRoof) {
+            squirrel.y += 1;
+            shadow.y += 1;
+        }
 
     }
 }
