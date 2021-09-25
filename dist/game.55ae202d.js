@@ -170,6 +170,12 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
       this.load.image('stump', './src/img/stump.png'); //48 x 48
 
       this.load.image('shadow', './src/img/shadow.png'); //48 x 48
+
+      this.load.image('sapling', './src/img/sapling.png'); //48 x 48
+
+      this.load.image('youngling', './src/img/youngling.png'); //48 x 48
+
+      this.load.image('wholeling', './src/img/wholeling.png'); //48 x 48
     }
   }, {
     key: "create",
@@ -184,6 +190,18 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
       };
       gameState.keyboard = this.input.keyboard.keys;
       gameState.cursors = this.input.keyboard.createCursorKeys(); //  Input Events	
+      //interface
+      //#region
+      //AcornDisplay
+
+      var acorns = gameState.inventory.acorns;
+      var acornDisplay = {
+        count: acorns,
+        sprites: [],
+        update: function update() {
+          console.log(this.count.length);
+        }
+      }; //#endregion
       //player
       //#region
       //squirrel & shadow
@@ -241,9 +259,18 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
         }),
         frameRate: 10,
         repeat: -1
+      });
+      this.anims.create({
+        key: 'acornShake',
+        frames: this.anims.generateFrameNumbers('acorn', {
+          frames: [0, 1, 0, 9]
+        }),
+        frameRate: 3,
+        repeat: -1
       }); //#endregion
       //actions
       //#region
+      //JUMP
 
       gameState.actions.jumpHelper = this.physics.add.sprite(0, 0);
       gameState.actions.jumpHelper.yChanged = false;
@@ -275,11 +302,15 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
             gameState.player.jumping = false;
           }
         });
-      };
+      }; //ATTACK
+
 
       var basicWeapon = {
         name: 'acorn',
-        delay: '500'
+        delay: 500,
+        growTime: 5000,
+        lifeTime: 50000,
+        dropRate: 2.5
       };
       gameState.weapons = {};
       gameState.weapons.currentWeapon = basicWeapon;
@@ -315,24 +346,25 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
             facingOffsetY = 25;
           }
 
-          var attackNut = _this.physics.add.sprite(squirrel.x + facingOffsetX, squirrel.y + facingOffsetY, 'acorn');
+          var attackNut = _this.physics.add.sprite(squirrel.x + facingOffsetX, squirrel.y + facingOffsetY, proj.name);
 
           attackNut.setScale(0.5);
           attackNut.anims.play('acornRotate', true);
 
-          var nutCol = _this.physics.add.collider(attackNut, stumps, function () {
-            console.log('contact');
+          var nutCol = _this.physics.add.collider(attackNut, squirrel, function () {
+            console.log('contact - change this when there are real targets for nuts!');
           });
 
           var acornTweenY = _this.tweens.add({
             paused: true,
             targets: attackNut,
-            y: squirrel.y - 100,
+            y: squirrel.y - 100 + 2 * facingOffsetY,
             ease: 'Sine',
             duration: 400,
             repeat: 0,
             yoyo: true,
             onComplete: function onComplete() {
+              gameState.actions.plant(attackNut, proj);
               attackNut.destroy();
             }
           });
@@ -356,7 +388,108 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
             console.log('Attack ready');
           });
         }
-      }; //#endregion
+      }; //GROW
+
+
+      gameState.trees = {
+        list: [],
+        grow: function grow(tree, scene) {
+          if (tree.sprite.name === 'sapling') {
+            var youngTree = scene.add.sprite(tree.sprite.x, tree.sprite.y, 'youngling');
+            youngTree.setName('youngling');
+            tree.sprite.destroy();
+            tree.sprite = youngTree;
+            scene.time.delayedCall(tree.type.growTime, function () {
+              gameState.trees.grow(tree, scene);
+            }); //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+          } else if (tree.sprite.name === 'youngling') {
+            var wholeTree = scene.add.sprite(tree.sprite.x, tree.sprite.y - 24, 'wholeling');
+            wholeTree.setName('wholeling');
+            wholeTree.setScale(1, 1);
+            tree.sprite.destroy();
+            tree.sprite = wholeTree;
+            scene.time.delayedCall(tree.type.lifeTime, function () {
+              gameState.trees.grow(tree, scene);
+            });
+            scene.time.delayedCall(tree.type.lifeTime, function () {
+              gameState.trees.grow(tree, scene);
+            });
+            scene.time.delayedCall(tree.type.lifeTime, function () {
+              gameState.trees.grow(tree, scene);
+            }); //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+            //Drop acorns
+
+            var drops = Math.ceil(Math.random() * tree.type.dropRate);
+
+            for (var ind = 0; ind < drops; ind++) {
+              scene.time.delayedCall(Math.floor(Math.random() * tree.type.lifeTime), function () {
+                var variance = 5;
+                gameState.actions.drop({
+                  x: tree.sprite.x - variance + Math.random() * variance * 2,
+                  y: 30 + tree.sprite.y - variance + Math.random() * variance * 2
+                }, tree.type);
+              });
+            }
+          } else if (tree.sprite.name === 'wholeling') {
+            tree.sprite.destroy(); //console.log(`${tree} has died.`);
+          } else {
+            console.log('an error has occurred in gameState.trees.grow()');
+          }
+
+          tree.step += 1;
+        }
+      }; //PLANT
+
+      gameState.actions.plant = function (attackNut, proj) {
+        //attackNut: The actual sprite being acted on
+        //proj:      Projectile properties
+        var treeBaby = _this.add.sprite(attackNut.x, attackNut.y, 'sapling').setName('sapling');
+
+        var newTree;
+        newTree = {
+          type: proj,
+          sprite: treeBaby,
+          step: 0,
+          growCallback: _this.time.delayedCall(proj.growTime, function () {
+            gameState.trees.grow(newTree, _this);
+          })
+        };
+        gameState.trees.list.push(newTree);
+      }; //DROP
+
+
+      gameState.actions.drop = function (pt, proj) {
+        var fallDist = 85;
+
+        var newNut = _this.physics.add.sprite(pt.x, pt.y - fallDist, proj.name);
+
+        newNut.setScale(0.35);
+        newNut.anims.play('acornRotate');
+
+        var dropTween = _this.tweens.add({
+          paused: false,
+          targets: newNut,
+          y: newNut.y + fallDist,
+          ease: 'Bounce',
+          duration: 1000,
+          repeat: 0,
+          yoyo: false,
+          onComplete: function onComplete() {
+            if (newNut) {
+              var nutCol = _this.physics.add.collider(newNut, gameState.player.squirrel, function () {
+                newNut.destroy();
+                gameState.inventory.acorns.display.add(_this, 1);
+              });
+
+              newNut.anims.stop();
+            }
+          }
+        });
+      };
+
+      for (var i = 1; i < 2; i++) {
+        gameState.actions.drop(gameState.world.randomPoint(), gameState.weapons.currentWeapon);
+      } //#endregion
       // ===WORLD===
       //bgFloors
       //#region
@@ -385,13 +518,12 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
       var roof1 = roofs.create(400, 190, 'floor').setScale(5, 10).refreshBody();
       roofs.setVisible(false); //#endregion
       //stumps
-      //#region
 
-      var stumps = this.physics.add.group({
-        allowGravity: false
-      });
-      var s1 = stumps.create(225, 490, 'stump');
-      var s2 = stumps.create(0, game.config.height, 'stump'); //#endregion
+      /*
+      var stumps = this.physics.add.group({ allowGravity: false });
+      var s1 = stumps.create(225,490, 'stump');
+      var s2 = stumps.create(0,game.config.height, 'stump');
+      */
       //world colliders
       //#region
 
@@ -402,13 +534,14 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
       var flCol = this.physics.add.collider(gameState.player.squirrel, bgFloors, function () {
         gameState.player.touchingRoof = false;
       });
-      flCol.overlapOnly = true;
-      var stCol = this.physics.add.collider(gameState.player.squirrel, stumps, function () {}); //#endregion
+      flCol.overlapOnly = true; //var stCol = this.physics.add.collider(gameState.player.squirrel, stumps, () => {
+      //});
+      //#endregion
       //layers
       //#region
 
       var charLayer = this.add.layer([sqrl, shadow]);
-      var midLayer = this.add.layer([s1, s2]);
+      var midLayer = this.add.layer([]);
       var bgLayer = this.add.layer([floor1, floor2, floor3, bgFloor1, bgFloor2]);
       charLayer.setDepth(0);
       midLayer.setDepth(1);
@@ -440,7 +573,10 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
       var shadow = gameState.player.children.entries[1];
 
       if (attack) {
-        gameState.actions.attack();
+        if (gameState.inventory.acorns.display.count > 0 && !gameState.actions.attack.disabled) {
+          gameState.inventory.acorns.display.add(this, -1);
+          gameState.actions.attack();
+        }
       }
 
       if (jump) {
@@ -507,15 +643,89 @@ var GameScene = /*#__PURE__*/function (_Phaser$Scene) {
 
         gameState.actions.jumpHelper.lastY = gameState.actions.jumpHelper.y;
       }
+
+      if (player.touchingRoof) {
+        squirrel.y += 1;
+        shadow.y += 1;
+      } //gameState.inventory.display.update();
+
     }
   }]);
 
   return GameScene;
 }(Phaser.Scene);
 
+var player = {
+  squirrel: {},
+  shadow: {},
+  touchingRoof: false,
+  onGround: false,
+  jumping: false,
+  facing: ''
+};
+var actions = {
+  jumpHelper: {
+    y: '',
+    lastY: ''
+  }
+};
 var gameState = {
-  player: {},
-  actions: {}
+  inventory: {
+    acorns: {
+      display: {
+        count: 1,
+        symbol: '',
+        sprites: [],
+        update: function update(scene) {
+          if (!this.symbol) {
+            this.symbol = scene.add.sprite(26, 36, 'acorn');
+            this.symbol.setScale(0.4);
+            this.symbol.anims.play('acornShake');
+          }
+
+          var countLen = this.count.toString().length;
+          var len = this.sprites.length;
+
+          if (len < countLen) {
+            var newDigit = scene.add.text(30 + 20 * countLen, 30);
+            this.sprites.push(newDigit);
+          } else if (len > countLen) {
+            var last = this.sprites.pop();
+            last.destroy();
+          }
+
+          for (digit = 0; digit < countLen; digit++) {
+            var valueAtDigit = this.count.toString().charAt(digit);
+            this.sprites[digit].setText(valueAtDigit); //console.log(this.sprites[digit].value);
+          }
+        },
+        add: function add(scene, num) {
+          this.count += num;
+          this.update(scene);
+        }
+      }
+    }
+  },
+  world: {
+    bounds: {
+      top: 390,
+      left: 0,
+      bottom: 650,
+      right: 800
+    },
+    randomPoint: function randomPoint() {
+      var x = Math.floor(Math.random() * this.bounds.right);
+      var y = Math.floor(Math.random() * (this.bounds.bottom - this.bounds.top)) + this.bounds.top;
+      var pt = {
+        x: x,
+        y: y
+      };
+      return pt;
+    }
+  },
+  player: player,
+  actions: actions,
+  weapons: {}
 };
 var controls = {};
 var config = {
