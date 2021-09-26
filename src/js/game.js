@@ -11,6 +11,8 @@ class GameScene extends Phaser.Scene {
         this.load.spritesheet('acorn', './src/img/acorn.png', { frameWidth:48, frameHeight:48 } );  //48 x 48
         this.load.spritesheet('ufo', './src/img/ufosheet.png', { frameWidth:48, frameHeight:96 } );  //48 x 48
         this.load.image('ufoGuy', './src/img/ufoPopup.png') ;  //48 x 48
+        this.load.image('beam', './src/img/beam.png') ;  //8 x 1
+        this.load.image('beamHitbox', './src/img/beamHitbox.png') ;  //16 x 16
         this.load.image('stump', './src/img/stump.png') ;  //48 x 48
         this.load.image('shadow', './src/img/shadow.png') ;  //48 x 48
         this.load.image('sapling', './src/img/sapling.png') ;  //48 x 48
@@ -121,29 +123,137 @@ class GameScene extends Phaser.Scene {
 
         let wiggleRoom = 17;
 
-        var ufoGuy  = this.physics.add.sprite(game.config.width/2, 300, 'ufoGuy');
-        var beam    = this.physics.add.sprite(game.config.width/2, 300, 'beam');
-        var ufo     = this.physics.add.sprite(game.config.width/2, 300, 'ufo');
+        var ufoGuy      = this.physics.add.sprite(game.config.width/2, 300, 'ufoGuy');
+        var beam        = this.physics.add.sprite(game.config.width/2, 300, 'beam');
+        var ufo         = this.physics.add.sprite(game.config.width/2, 300, 'ufo');
 
-        this.physics.add.overlap(beam, gameState.player, () => {
+        var beamHitbox  = this.physics.add.sprite(game.config.width/2, 300, 'beamHitbox');
+
+        beam.hitbox     = beamHitbox;
+
+        beam.hitbox.setVisible(false);
+
+        
+
+        
+        let beamBase = 34;
+        beam.y += beamBase;
+
+
+        beam.shoot = () => {}
+
+        this.physics.add.overlap(beam.hitbox, gameState.player, () => {
             console.log('pyoot')
         });
 
-        var ship = this.physics.add.group([ufoGuy, beam, ufo]);
+        var ship = this.physics.add.group([ufoGuy, beam, beamHitbox, ufo]);
+
+        beam.hitbox.shootOffset = ship.getChildren()[0].y + beamBase;
+
+
         ufo.anims.play('ufoSpin');
 
-        let ufoGuyTween = this.tweens.add({
-            paused:     false,
-            targets:    ufoGuy,
-            y:          ufoGuy.y + wiggleRoom,
-            ease:       'Bounce',
-            duration:   1600,
-            repeat:     -1,
-            yoyo:       true,
-            onComplete: function () {
-            }
-        });
+    
 
+        ship.move = (type, coords = {} ) => {
+
+            let x;
+            let y;
+
+            if(!coords.x) {
+                let pt  =   gameState.world.getRandomPoint();
+                x = pt.x;
+                y = pt.y;
+            } else {
+                x = coords.x;
+                y = coords.y;
+            }
+
+            let ufoGroup = ship.getChildren();
+
+            let shipPathTween;
+            
+
+            switch(type) {
+                case    'path':
+
+                shipPathTween = this.tweens.add({
+                    paused:     false,
+                    targets:    ufoGroup,
+                    x:          x,
+                    y:          y,
+                    ease:       'Sine',
+                    duration:   1600,
+                    repeat:     0,
+                    yoyo:       false,
+                    onComplete: function () {
+                        ship.getChildren()[1].shoot(0);
+                    }
+                });
+
+
+                break;
+                
+                case    'attack':
+
+                break;
+
+                case    'random':
+
+                    shipPathTween = this.tweens.add({
+                        paused:     false,
+                        targets:    ufoGroup,
+                        x:          x,
+                        y:          y - 300,
+                        ease:       'Sine',
+                        duration:   1600,
+                        repeat:     0,
+                        yoyo:       false,
+                        onComplete: function () {
+                            ship.getChildren()[1].shoot(0);
+                            ship.move('random');
+                        }
+                    });
+
+                break;
+
+                case    'placeholder':
+
+                break;
+                default:
+
+                break;
+            }
+
+            console.log(type);
+            console.log(x);
+            console.log(y);
+
+
+        }
+        
+
+        
+        function shoot(dist) {
+            if (dist == 0) {
+                this.setVisible(false);
+                this.hitbox.setVisible(false);
+            } else {
+                this.setVisible(true);
+                this.hitbox.setVisible(true);
+                
+                this.setScale(1, dist);
+                this.y =  this.hitbox.shootOffset + dist/2;
+
+                this.hitbox.y   =   this.hitbox.shootOffset + dist
+            }
+        }
+
+        beam.shoot = shoot;
+
+        
+        //ship.move('path', {x: 500, y: 500});
+        ship.move('random');
 
         //#endregion
 
@@ -383,7 +493,7 @@ class GameScene extends Phaser.Scene {
         }
 
         for (let i = 1; i < 2; i++){
-            gameState.actions.drop(gameState.world.randomPoint(), gameState.weapons.currentWeapon);
+            gameState.actions.drop(gameState.world.getRandomPoint(), gameState.weapons.currentWeapon);
         }
 
         //#endregion
@@ -642,7 +752,7 @@ var gameState = {
             bottom: 650,
             right:  800
         },
-        randomPoint() {
+        getRandomPoint() {
             var x = Math.floor(  Math.random() * this.bounds.right );
             var y = Math.floor(  Math.random() * (this.bounds.bottom - this.bounds.top)  )  + this.bounds.top;
             var pt  = {x, y}
