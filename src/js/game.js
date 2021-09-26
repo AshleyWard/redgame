@@ -116,10 +116,14 @@ class GameScene extends Phaser.Scene {
         gameState.player.shadow = shadow;
         //#endregion
 
+        gameState.trees.list = {}
+        gameState.trees.list = this.add.group();
+
         //ufo       // SO much refactoring to be done in here
         //#region
         
         //UFO
+
 
         let wiggleRoom = 17;
 
@@ -133,57 +137,58 @@ class GameScene extends Phaser.Scene {
         ufoGuy.name = 'ufoGuy';
         beamHitbox.name = 'beamHitbox';
 
-        
-        
+        gameState.enemy.ufo     =   ufo
+        gameState.enemy.ufoGuy  =   ufoGuy
+        gameState.enemy.beam    =   {
+            sprite: beam,
+            hitbox: beamHitbox,
+            offset: 34,
+            attack: {
+                frequency:      3,
+                movesSinceLast: 0
+            },
+            shoot:  function () {},
+            hit:    function () {}
 
-
-        beam.hitbox     = beamHitbox;
-        beam.hitbox.setVisible(false);
-        beam.setOrigin(0.5, 0)
-
-        beam.attack = {
-            frequency:      3,
-            movesSinceLast: 0
         }
-        
+
+        let enemy = gameState.enemy;
+
+        enemy.beam.hitbox.setVisible(false);
+        enemy.beam.sprite.setOrigin(0.5, 0);
+
+        enemy.beam.sprite.y += enemy.beam.offset;
+
+        enemy.ship = this.physics.add.group([ufoGuy, beam, beamHitbox, ufo]);
+
+        enemy.beam.hitbox.shootOffset = enemy.ship.getChildren()[0].y + enemy.beam.offset;
+
+
+        enemy.ufo.anims.play('ufoSpin');
 
         
-        let beamBase = 34;
-        beam.y += beamBase;
 
 
-        this.physics.add.overlap(beam.hitbox, gameState.trees, () => {
-            console.log('pyoot')
-        });
+        enemy.beam.shoot = (dist) => {
 
-        var ship = this.physics.add.group([ufoGuy, beam, beamHitbox, ufo]);
-
-        beam.hitbox.shootOffset = ship.getChildren()[0].y + beamBase;
-
-
-        ufo.anims.play('ufoSpin');
-
-
-        beam.shoot = (dist) => {
-
-            beam.setY(ufo.y)
+        enemy.beam.sprite.setY(ufo.y)
 
             if (!dist) {
-                beam.setVisible(false);
-                beam.hitbox.setVisible(false);
+                enemy.beam.sprite.setVisible(false);
+                enemy.beam.hitbox.setVisible(false);
             } else {
-                beam.setScale(1, dist);
-                beam.setVisible(true);
-                beam.hitbox.setVisible(true);
+                enemy.beam.sprite.setScale(1, dist);
+                enemy.beam.sprite.setVisible(true);
+                enemy.beam.hitbox.setVisible(true);
 
-                beam.setY(ufo.y + beamBase)
-                beam.hitbox.setY(beam.getBottomLeft().y) + dist/2
+                enemy.beam.sprite.setY(enemy.ufo.y + enemy.beam.offset)
+                enemy.beam.hitbox.setY(enemy.beam.sprite.getBottomLeft().y) + dist/2
                 
             }
         };
     
 
-        ship.move = (type, coords = {} ) => {
+        enemy.ship.move = (type, coords = {} ) => {
 
             let x;
             let y;
@@ -196,9 +201,6 @@ class GameScene extends Phaser.Scene {
                 x = coords.x;
                 y = coords.y;
             }
-
-            let ufoGroup = ship.getChildren();
-            let beam = ufoGroup[1];
 
             let shipPathTween;
             
@@ -230,21 +232,21 @@ class GameScene extends Phaser.Scene {
 
                 case    'random':
 
-                    if (beam.attack.frequency <= beam.attack.movesSinceLast) {
-                        beam.shoot(300);
-                        beam.attack.movesSinceLast = 0;
+                    if (enemy.beam.attack.frequency <= enemy.beam.attack.movesSinceLast) {
+                        enemy.beam.shoot(300);
+                        enemy.beam.attack.movesSinceLast = 0;
                     } else {
-                        beam.shoot(0);
+                        enemy.beam.shoot(0);
                     }
 
                     
 
-                    ufoGroup.forEach( (child) => {
+                    enemy.ship.getChildren().forEach( (child) => {
                         var offset = 0;
                         if (child.name === 'beam'){
-                            offset = beamBase;
+                            offset = enemy.beam.offset;
                         } else if (child.name === 'beamHitbox'){
-                            offset = beamBase + (beam.getBottomLeft().y - beam.getTopLeft().y);
+                            offset = enemy.beam.offset + (enemy.beam.sprite.getBottomLeft().y - enemy.beam.sprite.getTopLeft().y);
                         }
 
                         shipPathTween = this.tweens.add({
@@ -258,8 +260,8 @@ class GameScene extends Phaser.Scene {
                             yoyo:       false,
                             onComplete: function () {
                                 if (child.name === 'ufo') {
-                                    ship.move('random');
-                                    beam.attack.movesSinceLast += 1;
+                                    enemy.ship.move('random');
+                                    enemy.beam.attack.movesSinceLast += 1;
                                 }
                             }
                         });
@@ -276,13 +278,16 @@ class GameScene extends Phaser.Scene {
 
                 break;
             }
+        }
 
+        enemy.beam.hit = (target) => {
 
+            console.log(target.name);
         }
 
         
         //ship.move('path', {x: 500, y: 500});
-        ship.move('random');
+        enemy.ship.move('random');
 
         //#endregion
 
@@ -406,84 +411,101 @@ class GameScene extends Phaser.Scene {
 
 
         //GROW
-        gameState.trees = {
-            list:   [],
-            grow:   function(tree, scene){
-                if (tree.sprite.name === 'sapling'){
 
-                    var youngTree = scene.add.sprite(tree.sprite.x, tree.sprite.y, 'youngling')
-                    youngTree.setName('youngling');
-                    
-                    tree.sprite.destroy()
-                    tree.sprite = youngTree;
+        gameState.trees.grow    =   function(tree, scene){
 
-                    scene.time.delayedCall(tree.type.growTime, () => {
-                        gameState.trees.grow(tree, scene);
+            if (tree.sprite.name === 'sapling'){
+
+                var youngTree = scene.physics.add.sprite(tree.sprite.x, tree.sprite.y, 'youngling')
+                youngTree.setName('youngling');
+                
+                tree.sprite.destroy()
+                tree.sprite = youngTree;
+
+                scene.time.delayedCall(tree.type.growTime, () => {
+                    gameState.trees.grow(tree, scene);
+                });
+
+                //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+
+            } else if (tree.sprite.name === 'youngling'){
+
+                var wholeTree = scene.physics.add.sprite(tree.sprite.x, tree.sprite.y-24, 'wholeling');
+                wholeTree.setName('wholeling');
+                wholeTree.setScale(1,1);
+
+                
+                tree.sprite.destroy()
+                tree.sprite = wholeTree;
+
+                scene.time.delayedCall(tree.type.lifeTime, () => {
+                    gameState.trees.grow(tree, scene);
+                });
+                
+                scene.time.delayedCall(tree.type.lifeTime, () => {
+                    gameState.trees.grow(tree, scene);
+                });
+
+                scene.time.delayedCall(tree.type.lifeTime, () => {
+                    gameState.trees.grow(tree, scene);
+                });
+
+                //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
+
+                //Drop acorns
+                let drops = Math.ceil(Math.random() * tree.type.dropRate);
+                for (let ind = 0; ind < drops; ind++){
+                    scene.time.delayedCall(Math.floor(Math.random() * tree.type.lifeTime), () => {
+                        var variance = 5;
+                        gameState.actions.drop({ x: tree.sprite.x - variance + Math.random() * variance*2, y: 30 + tree.sprite.y - variance + Math.random() * variance * 2}, tree.type)
                     });
-
-                    //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
-
-                } else if (tree.sprite.name === 'youngling'){
-
-                    var wholeTree = scene.add.sprite(tree.sprite.x, tree.sprite.y-24, 'wholeling');
-                    wholeTree.setName('wholeling');
-                    wholeTree.setScale(1,1);
-
-                    
-                    tree.sprite.destroy()
-                    tree.sprite = wholeTree;
-
-                    scene.time.delayedCall(tree.type.lifeTime, () => {
-                        gameState.trees.grow(tree, scene);
-                    });
-                    
-                    scene.time.delayedCall(tree.type.lifeTime, () => {
-                        gameState.trees.grow(tree, scene);
-                    });
-
-                    scene.time.delayedCall(tree.type.lifeTime, () => {
-                        gameState.trees.grow(tree, scene);
-                    });
-
-                    //console.log(`${tree} has grown, it is now a ${tree.sprite.name}`)
-
-                    //Drop acorns
-                    let drops = Math.ceil(Math.random() * tree.type.dropRate);
-                    for (let ind = 0; ind < drops; ind++){
-                        scene.time.delayedCall(Math.floor(Math.random() * tree.type.lifeTime), () => {
-                            var variance = 5;
-                            gameState.actions.drop({ x: tree.sprite.x - variance + Math.random() * variance*2, y: 30 + tree.sprite.y - variance + Math.random() * variance * 2}, tree.type)
-                        });
-                    }
-
-                } else if (tree.sprite.name === 'wholeling'){
-                    
-                    tree.sprite.destroy()
-                    //console.log(`${tree} has died.`);
-
-                } else {
-                    console.log('an error has occurred in gameState.trees.grow()');
                 }
 
-                tree.step += 1
+            } else if (tree.sprite.name === 'wholeling'){
+                
+                tree.sprite.destroy()
+                //console.log(`${tree} has died.`);
+
+            } else {
+                console.log('an error has occurred in gameState.trees.grow()');
             }
+
+            tree.overlap = scene.physics.add.overlap(tree.sprite, gameState.enemy.beam.hitbox, () => {
+                enemy.beam.hit(tree.sprite);
+            });
+
+            tree.step += 1
         }
 
         //PLANT
         gameState.actions.plant = (attackNut, proj) => {
             //attackNut: The actual sprite being acted on
             //proj:      Projectile properties
-            var treeBaby = this.add.sprite(attackNut.x, attackNut.y, 'sapling').setName('sapling');
+            //attacknutXY
+            //gamestate.world.bounds top left bottom right
+            if (attackNut.x < gameState.world.bounds.left || attackNut.x > gameState.world.bounds.right) {
+                attackNut.x = gameState.world.getRandomPoint().x
+            }
+            if (attackNut.y < gameState.world.bounds.top || attackNut.y > gameState.world.bounds.bottom) {
+                attackNut.y = gameState.world.getRandomPoint().y
+            }
+
+            var treeBaby = this.physics.add.sprite(attackNut.x, attackNut.y, 'sapling').setName('sapling');
             var newTree;
             newTree = {
                 type:           proj,
                 sprite:         treeBaby,
                 step:           0,
+                overlap:        {},
                 growCallback:   this.time.delayedCall(proj.growTime, () => {
                     gameState.trees.grow(newTree, this);
+
                 })
             }
-            gameState.trees.list.push(newTree);
+            newTree.overlap = this.physics.add.overlap(newTree.sprite, gameState.enemy.beam.hitbox, () => {
+                enemy.beam.hit(newTree.sprite);
+            });
+            gameState.trees.list.create(newTree);
 
         }
 
@@ -730,10 +752,24 @@ var actions = {
     }
 }
 
-
 var gameState = {
+    enemy:  {
+        ship:       '',
+        ufo:        {},
+        ufoGuy:     {},
+        beam:       {
+            sprite: {},
+            hitbox: {},
+            offset: 34,
+            attack: {
+                frequency:      3,
+                movesSinceLast: 0
+            },
+            shoot:  function () {},
+            hit:    function () {}
+        }
+    },
     trees: {
-        list: [],
         grow: () => {}
     },
     inventory: {
@@ -783,7 +819,7 @@ var gameState = {
         bounds:     {
             top:    390,
             left:   0,
-            bottom: 650,
+            bottom: 630,
             right:  800
         },
         getRandomPoint() {
