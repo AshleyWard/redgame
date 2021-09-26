@@ -9,6 +9,8 @@ class GameScene extends Phaser.Scene {
     {	
         this.load.spritesheet('sqrl', './src/img/SQORL.png', { frameWidth:48, frameHeight:48 } );  //48 x 48
         this.load.spritesheet('acorn', './src/img/acorn.png', { frameWidth:48, frameHeight:48 } );  //48 x 48
+        this.load.spritesheet('ufo', './src/img/ufosheet.png', { frameWidth:48, frameHeight:96 } );  //48 x 48
+        this.load.image('ufoGuy', './src/img/ufoPopup.png') ;  //48 x 48
         this.load.image('stump', './src/img/stump.png') ;  //48 x 48
         this.load.image('shadow', './src/img/shadow.png') ;  //48 x 48
         this.load.image('sapling', './src/img/sapling.png') ;  //48 x 48
@@ -45,25 +47,7 @@ class GameScene extends Phaser.Scene {
 
         //#endregion
 
-        //player
-        //#region
-        //squirrel & shadow
-        var sqrl    = this.physics.add.sprite(game.config.width/2, game.config.height-100, 'sqrl')
-        var shadow  = this.add.sprite(game.config.width/2, game.config.height-100, 'shadow')
-
-        sqrl.speed  = 220;
-        shadow.y    = sqrl.y+25;
-        
-        //sq+sh become player
-        var player = this.physics.add.group([sqrl, shadow]);
-        
-        gameState.player = player;
-
-        gameState.player.onGround = true;
-        gameState.player.squirrel = sqrl;
-        gameState.player.shadow = shadow;
-        //#endregion
-        
+                                
         //anims
         //#region
         this.anims.create({
@@ -91,6 +75,12 @@ class GameScene extends Phaser.Scene {
             repeat: -1
         });
         this.anims.create({
+            key: 'ufoSpin',
+            frames: this.anims.generateFrameNumbers('ufo', {start: 0, end: 4}),
+            frameRate: 8,
+            repeat: -1
+        });
+        this.anims.create({
             key: 'acornRotate',
             frames: this.anims.generateFrameNumbers('acorn', {start: 0, end: 9}),
             frameRate: 10,
@@ -103,6 +93,55 @@ class GameScene extends Phaser.Scene {
             repeat: -1
         });
         //#endregion
+
+
+        //player
+        //#region
+        //squirrel & shadow
+        var sqrl    = this.physics.add.sprite(game.config.width/2, game.config.height-100, 'sqrl')
+        var shadow  = this.add.sprite(game.config.width/2, game.config.height-100, 'shadow')
+
+        sqrl.speed  = 220;
+        shadow.y    = sqrl.y+25;
+        
+        //sq+sh become player
+        var player = this.physics.add.group([sqrl, shadow]);
+        
+        gameState.player = player;
+
+        gameState.player.onGround = true;
+        gameState.player.squirrel = sqrl;
+        gameState.player.shadow = shadow;
+        //#endregion
+
+        //ufo
+        //#region
+        
+        //UFO
+
+        let wiggleRoom = 17;
+
+        var ufoGuy  = this.physics.add.sprite(game.config.width/2, 300, 'ufoGuy');
+        var ufo     = this.physics.add.sprite(game.config.width/2, 300, 'ufo');
+
+        var ship = this.physics.add.group([ufoGuy, ufo]);
+        ufo.anims.play('ufoSpin');
+
+        let ufoGuyTween = this.tweens.add({
+            paused:     false,
+            targets:    ufoGuy,
+            y:          ufoGuy.y + wiggleRoom,
+            ease:       'Bounce',
+            duration:   1600,
+            repeat:     -1,
+            yoyo:       true,
+            onComplete: function () {
+            }
+        });
+
+
+        //#endregion
+
 
         //actions
         //#region
