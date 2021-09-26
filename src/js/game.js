@@ -116,7 +116,7 @@ class GameScene extends Phaser.Scene {
         gameState.player.shadow = shadow;
         //#endregion
 
-        //ufo
+        //ufo       // SO much refactoring to be done in here
         //#region
         
         //UFO
@@ -126,13 +126,25 @@ class GameScene extends Phaser.Scene {
         var ufoGuy      = this.physics.add.sprite(game.config.width/2, 300, 'ufoGuy');
         var beam        = this.physics.add.sprite(game.config.width/2, 300, 'beam');
         var ufo         = this.physics.add.sprite(game.config.width/2, 300, 'ufo');
-
         var beamHitbox  = this.physics.add.sprite(game.config.width/2, 300, 'beamHitbox');
+        
+        ufo.name = 'ufo';
+        beam.name = 'beam';
+        ufoGuy.name = 'ufoGuy';
+        beamHitbox.name = 'beamHitbox';
+
+        
+        
+
 
         beam.hitbox     = beamHitbox;
-
         beam.hitbox.setVisible(false);
+        beam.setOrigin(0.5, 0)
 
+        beam.attack = {
+            frequency:      3,
+            movesSinceLast: 0
+        }
         
 
         
@@ -140,9 +152,7 @@ class GameScene extends Phaser.Scene {
         beam.y += beamBase;
 
 
-        beam.shoot = () => {}
-
-        this.physics.add.overlap(beam.hitbox, gameState.player, () => {
+        this.physics.add.overlap(beam.hitbox, gameState.trees, () => {
             console.log('pyoot')
         });
 
@@ -153,6 +163,24 @@ class GameScene extends Phaser.Scene {
 
         ufo.anims.play('ufoSpin');
 
+
+        beam.shoot = (dist) => {
+
+            beam.setY(ufo.y)
+
+            if (!dist) {
+                beam.setVisible(false);
+                beam.hitbox.setVisible(false);
+            } else {
+                beam.setScale(1, dist);
+                beam.setVisible(true);
+                beam.hitbox.setVisible(true);
+
+                beam.setY(ufo.y + beamBase)
+                beam.hitbox.setY(beam.getBottomLeft().y) + dist/2
+                
+            }
+        };
     
 
         ship.move = (type, coords = {} ) => {
@@ -170,6 +198,7 @@ class GameScene extends Phaser.Scene {
             }
 
             let ufoGroup = ship.getChildren();
+            let beam = ufoGroup[1];
 
             let shipPathTween;
             
@@ -179,7 +208,6 @@ class GameScene extends Phaser.Scene {
 
                 shipPathTween = this.tweens.add({
                     paused:     false,
-                    targets:    ufoGroup,
                     x:          x,
                     y:          y,
                     ease:       'Sine',
@@ -187,9 +215,11 @@ class GameScene extends Phaser.Scene {
                     repeat:     0,
                     yoyo:       false,
                     onComplete: function () {
-                        ship.getChildren()[1].shoot(0);
+                        //beam.shoot(0);
                     }
                 });
+
+                ufoGroup.tweens.play(shipPathTween);
 
 
                 break;
@@ -200,20 +230,42 @@ class GameScene extends Phaser.Scene {
 
                 case    'random':
 
-                    shipPathTween = this.tweens.add({
-                        paused:     false,
-                        targets:    ufoGroup,
-                        x:          x,
-                        y:          y - 300,
-                        ease:       'Sine',
-                        duration:   1600,
-                        repeat:     0,
-                        yoyo:       false,
-                        onComplete: function () {
-                            ship.getChildren()[1].shoot(0);
-                            ship.move('random');
+                    if (beam.attack.frequency <= beam.attack.movesSinceLast) {
+                        beam.shoot(300);
+                        beam.attack.movesSinceLast = 0;
+                    } else {
+                        beam.shoot(0);
+                    }
+
+                    
+
+                    ufoGroup.forEach( (child) => {
+                        var offset = 0;
+                        if (child.name === 'beam'){
+                            offset = beamBase;
+                        } else if (child.name === 'beamHitbox'){
+                            offset = beamBase + (beam.getBottomLeft().y - beam.getTopLeft().y);
                         }
-                    });
+
+                        shipPathTween = this.tweens.add({
+                            paused:     false,
+                            targets:    child,
+                            x:          x,
+                            y:          y - 300 + offset,
+                            ease:       'Sine',
+                            duration:   1600,
+                            repeat:     0,
+                            yoyo:       false,
+                            onComplete: function () {
+                                if (child.name === 'ufo') {
+                                    ship.move('random');
+                                    beam.attack.movesSinceLast += 1;
+                                }
+                            }
+                        });
+                    })
+
+                    
 
                 break;
 
@@ -225,31 +277,8 @@ class GameScene extends Phaser.Scene {
                 break;
             }
 
-            console.log(type);
-            console.log(x);
-            console.log(y);
-
 
         }
-        
-
-        
-        function shoot(dist) {
-            if (dist == 0) {
-                this.setVisible(false);
-                this.hitbox.setVisible(false);
-            } else {
-                this.setVisible(true);
-                this.hitbox.setVisible(true);
-                
-                this.setScale(1, dist);
-                this.y =  this.hitbox.shootOffset + dist/2;
-
-                this.hitbox.y   =   this.hitbox.shootOffset + dist
-            }
-        }
-
-        beam.shoot = shoot;
 
         
         //ship.move('path', {x: 500, y: 500});
@@ -683,6 +712,7 @@ class GameScene extends Phaser.Scene {
     }
 }
 
+
 var player = {
     squirrel:       {},
     shadow:         {},
@@ -702,6 +732,10 @@ var actions = {
 
 
 var gameState = {
+    trees: {
+        list: [],
+        grow: () => {}
+    },
     inventory: {
         acorns: {
             display:    {
