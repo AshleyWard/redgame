@@ -281,9 +281,12 @@ class GameScene extends Phaser.Scene {
         }
 
         enemy.beam.hit = (target) => {
-                console.log(target.name);
-            if (target.name == 'sapling' || target.name == 'youngling' || target.name == 'wholeling') {
-                target.destroy();
+            if (enemy.beam.sprite.visible) {
+            
+                if (target.name == 'sapling' || target.name == 'youngling' || target.name == 'wholeling') {
+                    target.destroy();
+                }
+
             }
         }
 
