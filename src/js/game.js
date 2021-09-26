@@ -281,10 +281,12 @@ class GameScene extends Phaser.Scene {
         }
 
         enemy.beam.hit = (target) => {
-            if (enemy.beam.sprite.visible) {
-            
-                if (target.name == 'sapling' || target.name == 'youngling' || target.name == 'wholeling') {
-                    target.destroy();
+            if (enemy.beam.sprite.visible) {            
+                if (target.sprite.name == 'sapling' || target.sprite.name == 'youngling' || target.sprite.name == 'wholeling') {
+                    target.growCallback.destroy();
+                    gameState.trees.list.remove(target.sprite);
+                    target.sprite.destroy();
+                    console.log(gameState.trees.list.getChildren())
                 }
 
             }
@@ -468,6 +470,8 @@ class GameScene extends Phaser.Scene {
 
             } else if (tree.sprite.name === 'wholeling'){
                 
+                
+                gameState.trees.list.remove(tree.sprite);
                 tree.sprite.destroy()
                 //console.log(`${tree} has died.`);
 
@@ -476,7 +480,7 @@ class GameScene extends Phaser.Scene {
             }
 
             tree.overlap = scene.physics.add.overlap(tree.sprite, gameState.enemy.beam.hitbox, () => {
-                enemy.beam.hit(tree.sprite);
+                enemy.beam.hit(tree);
             });
 
             tree.step += 1
@@ -508,7 +512,7 @@ class GameScene extends Phaser.Scene {
                 })
             }
             newTree.overlap = this.physics.add.overlap(newTree.sprite, gameState.enemy.beam.hitbox, () => {
-                enemy.beam.hit(newTree.sprite);
+                enemy.beam.hit(newTree);
             });
             gameState.trees.list.create(newTree);
 
