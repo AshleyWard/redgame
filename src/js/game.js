@@ -144,7 +144,7 @@ class GameScene extends Phaser.Scene {
             hitbox: beamHitbox,
             offset: 34,
             attack: {
-                frequency:      3,
+                frequency:      5,
                 movesSinceLast: 0
             },
             shoot:  function () {},
@@ -281,8 +281,10 @@ class GameScene extends Phaser.Scene {
         }
 
         enemy.beam.hit = (target) => {
-
-            console.log(target.name);
+                console.log(target.name);
+            if (target.name == 'sapling' || target.name == 'youngling' || target.name == 'wholeling') {
+                target.destroy();
+            }
         }
 
         
@@ -762,7 +764,7 @@ var gameState = {
             hitbox: {},
             offset: 34,
             attack: {
-                frequency:      3,
+                frequency:      5,
                 movesSinceLast: 0
             },
             shoot:  function () {},
