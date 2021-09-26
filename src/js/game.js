@@ -122,9 +122,14 @@ class GameScene extends Phaser.Scene {
         let wiggleRoom = 17;
 
         var ufoGuy  = this.physics.add.sprite(game.config.width/2, 300, 'ufoGuy');
+        var beam    = this.physics.add.sprite(game.config.width/2, 300, 'beam');
         var ufo     = this.physics.add.sprite(game.config.width/2, 300, 'ufo');
 
-        var ship = this.physics.add.group([ufoGuy, ufo]);
+        this.physics.add.overlap(beam, gameState.player, () => {
+            console.log('pyoot')
+        });
+
+        var ship = this.physics.add.group([ufoGuy, beam, ufo]);
         ufo.anims.play('ufoSpin');
 
         let ufoGuyTween = this.tweens.add({
